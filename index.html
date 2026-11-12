@@ -93,8 +93,12 @@
       z-index: 1;
       background: #0b132b;
       position: relative;
+      touch-action: pan-x pan-y pinch-zoom !important;
     }
     .leaflet-control-zoom { display: none !important; }
+    .leaflet-container {
+      touch-action: pan-x pan-y pinch-zoom !important;
+    }
 
     /* Offline / Sandbox SVG Tactical Map Grid Fallback */
     .offline-grid-bg {
@@ -104,7 +108,6 @@
         linear-gradient(to bottom, rgba(16, 185, 129, 0.08) 1px, transparent 1px);
       background-size: 32px 32px;
     }
-    .leaflet-control-zoom { display: none !important; }
 
     .glass-hud {
       background: rgba(15, 23, 42, 0.88);
@@ -250,69 +253,112 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-md shadow-emerald-500/40 animate-pulse">
-            <i id="navTurnIcon" class="fa-solid fa-arrow-up"></i>
+            <i class="fa-solid fa-arrow-up"></i>
           </div>
           <div>
-            <p id="navInstruction" class="font-extrabold text-sm text-white">Head north on Main Campus Boulevard</p>
-            <p id="navSubInstruction" class="text-xs text-emerald-400 font-mono">Next maneuver in <span id="navStepDist">80m</span></p>
+            <p class="text-[10px] font-mono text-emerald-400 uppercase font-bold tracking-wider">Active Guidance</p>
+            <h4 class="font-extrabold text-sm text-white">Continue on Campus Footpath</h4>
+            <p class="text-xs text-slate-300">Remaining: <span id="navStepDist" class="font-mono font-bold text-emerald-400">300m</span></p>
           </div>
         </div>
-        <button onclick="stopNavigation()" class="p-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-xs font-bold transition flex items-center gap-1">
-          <i class="fa-solid fa-xmark"></i> End
+        <button onclick="stopNavigation()" class="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-extrabold transition">
+          End
         </button>
       </div>
-      <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-        <div id="navProgressBar" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full w-0 transition-all duration-300"></div>
+      <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div id="navProgressBar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 0%"></div>
       </div>
     </div>
 
-    <!-- ================= MAIN RESPONSIVE VIEWPORT CONTAINER ================= -->
-    <div class="flex-1 flex flex-col lg:flex-row relative overflow-hidden h-full">
+    <!-- ================= MAIN WORKSPACE (MAP + ADAPTIVE SIDEBAR / BOTTOM SHEET) ================= -->
+    <div class="flex-1 flex flex-col-reverse lg:flex-row relative overflow-hidden">
 
-      <!-- ADAPTIVE COMMAND DRAWER (Mobile Snap Sheet & Desktop Side Drawer) -->
-      <aside id="sidePanel" class="sheet-transition fixed lg:relative bottom-0 left-0 right-0 lg:right-auto lg:top-0 w-full lg:w-[400px] h-[85vh] lg:h-full glass-hud border-t lg:border-t-0 lg:border-r border-slate-800 flex flex-col z-20 shadow-2xl safe-padding-bottom">
+      <!-- ADAPTIVE BOTTOM SHEET (MOBILE) / SIDEBAR (DESKTOP) -->
+      <aside id="sidePanel" class="glass-hud z-20 flex flex-col w-full lg:w-[420px] lg:h-full border-t lg:border-t-0 lg:border-r border-slate-800 rounded-t-3xl lg:rounded-none shadow-2xl sheet-transition safe-padding-bottom shrink-0" style="height: 45vh;">
         
-        <!-- MOBILE ERGONOMIC TOUCH DRAG HANDLE BAR -->
-        <div id="drawerDragHandle" class="lg:hidden w-full py-2.5 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing bg-slate-900/80 border-b border-slate-800 shrink-0">
-          <div class="w-12 h-1.5 bg-slate-600 rounded-full"></div>
-          <span class="text-[9px] font-mono text-slate-400 mt-1 uppercase tracking-wider">Swipe or Tap to Snap Panel</span>
+        <!-- Mobile Touch Drag Handle -->
+        <div id="drawerDragHandle" class="lg:hidden w-full py-3 flex flex-col items-center justify-center cursor-ns-resize shrink-0">
+          <div class="w-12 h-1.5 rounded-full bg-slate-600"></div>
         </div>
 
-        <!-- Drawer Navigation Tabs -->
-        <div class="flex border-b border-slate-800 bg-slate-900/60 p-1.5 gap-1 shrink-0">
-          <button id="tabRoutesBtn" onclick="switchTab('routes')" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition">
-            <i class="fa-solid fa-route"></i> Routes <span class="hidden sm:inline font-mono text-[10px] text-slate-500">[1]</span>
+        <!-- Navigation Mode Tabs -->
+        <div class="px-4 pb-2 pt-1 lg:pt-3 flex items-center gap-1.5 border-b border-slate-800/80 shrink-0">
+          <button id="tabRoutesBtn" onclick="switchTab('routes')" class="flex-1 py-2 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-route"></i> Routes
           </button>
-          <button id="tabBumpBtn" onclick="switchTab('bump')" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition">
-            <i class="fa-solid fa-radar"></i> Radar <span id="friendBadge" class="bg-emerald-500 text-slate-950 font-mono font-bold px-1.5 py-0.2 rounded-full text-[10px]">4</span> <span class="hidden sm:inline font-mono text-[10px] text-slate-500">[2]</span>
+          <button id="tabBumpBtn" onclick="switchTab('bump')" class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-radar"></i> Bump
           </button>
-          <button id="tabCfarBtn" onclick="switchTab('cfar')" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition">
-            <i class="fa-solid fa-tree"></i> Cfar Hub <span class="hidden sm:inline font-mono text-[10px] text-slate-500">[3]</span>
+          <button id="tabCfarBtn" onclick="switchTab('cfar')" class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-tree"></i> Cfar Hub
           </button>
         </div>
 
-        <!-- TAB 1: ROUTE PLANNER -->
-        <div id="tabRoutes" class="flex-1 overflow-y-auto p-4 space-y-4">
-          
-          <!-- Origin/Destination Input Box -->
-          <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 space-y-2 shadow-inner">
-            <div class="flex items-center gap-2 text-xs">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span class="text-slate-400 font-mono text-[10px] uppercase">FROM:</span>
-              <input type="text" id="originInput" value="Current GPS Position" class="w-full bg-transparent font-semibold text-slate-200 outline-none" readonly />
+        <!-- TAB 1: ROUTES & NEAREST STATION -->
+        <div id="tabRoutes" class="flex-1 overflow-y-auto p-4 space-y-3.5">
+          <!-- Origin/Destination Input Box (Moovit-Inspired Clean Search Card) -->
+          <div class="bg-slate-900/95 p-3 rounded-2xl border border-slate-700/80 shadow-lg relative">
+            <div class="flex items-center gap-2.5 text-xs pr-8">
+              <span class="w-2.5 h-2.5 rounded-full border-2 border-emerald-400 bg-slate-950 shrink-0"></span>
+              <input type="text" id="originInput" value="Current Location (HaKfar HaYarok)" class="w-full bg-slate-800/80 px-3 py-2 rounded-xl font-semibold text-slate-100 outline-none border border-slate-700/60" readonly />
             </div>
-            <div class="border-t border-slate-800/80 my-1"></div>
-            <div class="flex items-center gap-2 text-xs">
-              <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-              <span class="text-slate-400 font-mono text-[10px] uppercase">TO:</span>
-              <select id="destSelect" onchange="calculateRoutes()" class="w-full bg-slate-800 text-slate-100 font-semibold outline-none rounded-lg p-2 border border-slate-700">
+            
+            <!-- Swap Origin/Dest Button -->
+            <button onclick="swapOriginDestination()" title="Swap Origin & Destination" class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-800 hover:bg-emerald-500 text-slate-200 hover:text-slate-950 border border-slate-600 flex items-center justify-center shadow-md transition z-10">
+              <i class="fa-solid fa-arrows-up-down text-xs"></i>
+            </button>
+
+            <div class="flex items-center gap-2.5 text-xs mt-2 pr-8">
+              <i class="fa-solid fa-location-dot text-orange-500 text-sm w-2.5 text-center shrink-0"></i>
+              <select id="destSelect" onchange="calculateRoutes()" class="w-full bg-slate-800 text-slate-100 font-semibold outline-none rounded-xl px-3 py-2 border border-slate-700">
                 <option value="cfar_school">🏫 High School Academic Hub (Cfar)</option>
                 <option value="cfar_dorms">🏠 Student Dormitories (Pnimia)</option>
                 <option value="cfar_farm">🌾 Eco-Agricultural Farm & Grove</option>
-                <option value="cfar_gate">⛩️ Shaar HaKfar Main Gate & Transit Hub</option>
+                <option value="cfar_gate">⛩️ Tzomet HaKfar HaYarok (Main Junction)</option>
                 <option value="tlv_savidor">🚆 Tel Aviv Savidor Central Station</option>
+                <option value="kiryat_gat">🏙️ Kiryat Gat Central Station</option>
                 <option value="ramat_sokolov">🏙️ Ramat HaSharon Sokolov St.</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Moovit-Style Nearest Station Live Board -->
+          <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 space-y-2.5 shadow-md">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-bus"></i>
+                </span>
+                <div>
+                  <span class="text-[10px] font-mono text-slate-400 uppercase block">Nearest Station</span>
+                  <h4 class="font-extrabold text-xs text-white">Tzomet HaKfar HaYarok</h4>
+                </div>
+              </div>
+              <span class="text-[11px] font-mono text-blue-400 font-bold">130m • 3 min walk</span>
+            </div>
+
+            <div class="space-y-2 text-xs">
+              <div class="flex items-center justify-between bg-slate-950/60 px-2.5 py-2 rounded-xl border border-slate-800/80">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/50 text-amber-300 font-mono font-extrabold">48 <i class="fa-solid fa-bus text-[10px]"></i></span>
+                  <span class="text-slate-200 font-semibold">Tel Aviv - Yafo</span>
+                </div>
+                <div class="text-right font-mono">
+                  <span class="text-emerald-400 font-extrabold text-[11px] flex items-center gap-1"><i class="fa-solid fa-rss text-[9px]"></i> NOW</span>
+                  <span class="text-[10px] text-slate-400">5, 13 min</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between bg-slate-950/60 px-2.5 py-2 rounded-xl border border-slate-800/80">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/50 text-blue-300 font-mono font-extrabold">525 <i class="fa-solid fa-bus text-[10px]"></i></span>
+                  <span class="text-slate-200 font-semibold">Ramat Gan / Ayalon</span>
+                </div>
+                <div class="text-right font-mono">
+                  <span class="text-emerald-400 font-extrabold text-[11px] flex items-center gap-1"><i class="fa-solid fa-rss text-[9px]"></i> 5 min</span>
+                  <span class="text-[10px] text-slate-400">19:15, 19:52</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -414,23 +460,23 @@
           <!-- Map Zoom Buttons -->
           <div class="glass-hud rounded-2xl shadow-xl overflow-hidden flex flex-col border border-slate-700">
             <button onclick="map.zoomIn()" class="p-3 text-slate-200 hover:bg-emerald-500 hover:text-slate-950 transition">
-              <i class="fa-solid fa-plus text-sm"></i>
-            </button>
-            <div class="border-t border-slate-800"></div>
-            <button onclick="map.zoomOut()" class="p-3 text-slate-200 hover:bg-emerald-500 hover:text-slate-950 transition">
-              <i class="fa-solid fa-minus text-sm"></i>
-            </button>
+        <!-- Floating Map Control Overlays (Clean Pinch-to-Zoom, No Clunky +/- Buttons) -->
+        <div class="absolute top-4 right-4 z-20 flex flex-col items-end space-y-2.5 safe-padding-right">
+          <!-- Zoom Level Badge -->
+          <div id="zoomLevelBadge" class="glass-hud px-3 py-1.5 rounded-full shadow-xl border border-slate-700 text-[11px] font-mono text-slate-200 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="zoomText">Pinch to Zoom • Lvl 16</span>
           </div>
 
-          <!-- Recenter Button -->
-          <button onclick="recenterUser()" class="glass-hud p-3 rounded-2xl shadow-xl border border-slate-700 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition" title="Recenter Location">
+          <!-- Clean Recenter Button (Like Moovit/Google Maps) -->
+          <button onclick="recenterUser()" class="glass-hud w-11 h-11 rounded-full shadow-xl border border-slate-700 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition flex items-center justify-center" title="Recenter Location">
             <i class="fa-solid fa-crosshairs text-base"></i>
           </button>
 
           <!-- Immersive 'In-Person' AR Mode Switcher -->
-          <button onclick="toggleImmersiveAR()" class="glass-hud px-3.5 py-3 rounded-2xl shadow-xl border border-emerald-500/50 text-emerald-400 font-extrabold text-xs hover:bg-emerald-500 hover:text-slate-950 transition flex items-center gap-2">
-            <i class="fa-solid fa-vr-cardboard text-base"></i>
-            <span class="hidden sm:inline">In-Person AR [V]</span>
+          <button onclick="toggleImmersiveAR()" class="glass-hud px-3.5 py-2.5 rounded-full shadow-xl border border-emerald-500/60 text-emerald-300 font-extrabold text-xs hover:bg-emerald-500 hover:text-slate-950 transition flex items-center gap-2">
+            <i class="fa-solid fa-street-view text-base"></i>
+            <span>AR Live View</span>
           </button>
         </div>
 
@@ -495,7 +541,15 @@
     </div>
 
     <div class="relative flex-1 my-3 rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
-      <canvas id="arCanvas" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+      <!-- Live Camera Feed (When Permission Granted) -->
+      <video id="arCameraVideo" autoplay playsinline muted class="hidden absolute inset-0 w-full h-full object-cover"></video>
+      <!-- 3D AR Overlay Canvas -->
+      <canvas id="arCanvas" class="relative z-10 w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+      <!-- Camera Toggle Button inside AR -->
+      <button onclick="enableARCamera()" id="arCamToggleBtn" class="absolute top-4 left-4 z-20 glass-hud px-3 py-2 rounded-xl border border-emerald-500/50 text-xs font-bold text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 transition flex items-center gap-2">
+        <i class="fa-solid fa-camera"></i> <span id="arCamBtnText">Enable Live Camera</span>
+      </button>
 
       <!-- Mini-Map Radar -->
       <div class="absolute bottom-4 right-4 w-28 h-28 rounded-full border-2 border-emerald-400 shadow-2xl overflow-hidden glass-hud flex items-center justify-center pointer-events-none">
@@ -592,6 +646,7 @@
       cfarFarm: [32.1410, 34.8360],
       cfarSports: [32.1428, 34.8362],
       tlvSavidor: [32.0853, 34.7818],
+      kiryatGat: [31.6100, 34.7642],
       ramatSokolov: [32.1480, 34.8390]
     };
 
@@ -834,11 +889,11 @@
       if (!map) return;
       const z = map.getZoom();
       const zoomText = document.getElementById('zoomText');
-      let tier = 'City View';
-      if (z >= 17) tier = 'Micro Footpaths';
+      let tier = 'Cities';
+      if (z >= 17) tier = 'Streets & Paths';
       else if (z >= 15) tier = 'Campus View';
-      else if (z >= 13) tier = 'District Transit';
-      if (zoomText) zoomText.innerText = `Zoom: Level ${z} (${tier})`;
+      else if (z >= 12) tier = 'Districts';
+      if (zoomText) zoomText.innerText = `Zoom ${z} • ${tier}`;
 
       if (campusBuildingsLayer) {
         if (z >= 15 && !map.hasLayer(campusBuildingsLayer)) {
@@ -847,6 +902,16 @@
           map.removeLayer(campusBuildingsLayer);
         }
       }
+    }
+
+    function swapOriginDestination() {
+      const originInput = document.getElementById('originInput');
+      const destSelect = document.getElementById('destSelect');
+      const selectedText = destSelect.options[destSelect.selectedIndex].text.replace(/^[^\s]+\s/, '');
+      const temp = originInput.value;
+      originInput.value = selectedText;
+      showToast(`Swapped route direction: ${selectedText} → ${temp}`, "fa-arrows-up-down");
+      calculateRoutes();
     }
 
     // Geofence Teleport & Internal Priority Switcher
@@ -890,6 +955,7 @@
         cfar_farm: COORDS.cfarFarm,
         cfar_gate: COORDS.cfarGate,
         tlv_savidor: COORDS.tlvSavidor,
+        kiryat_gat: COORDS.kiryatGat,
         ramat_sokolov: COORDS.ramatSokolov
       };
 
@@ -903,14 +969,38 @@
           id: 'cfar_internal',
           mode: 'walk',
           title: isInsideCfar ? 'Internal Cfar Shaded Footpath' : 'Campus Direct Walkway',
-          subtitle: 'Zero traffic • Direct internal path inside HaKfar HaYarok',
+          subtitle: 'Leaves now • Direct internal path inside HaKfar HaYarok',
+          legsHtml: `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold"><i class="fa-solid fa-person-walking"></i> Direct Path</span>`,
           duration: isInsideCfar ? '4 min' : '18 min',
+          times: '18:34 → 18:38',
           price: '₪0.00',
           xp: '+150 XP',
-          eco: '100% Eco',
+          eco: 'CO2e: 0.0 kg',
           recommended: isInsideCfar,
           icon: 'fa-person-walking',
           accent: 'emerald',
+          coords: pathCoords
+        },
+        {
+          id: 'transit_hub',
+          mode: 'transit',
+          title: 'Multi-Leg Transit (Bus + Rail)',
+          subtitle: 'Departs in 2 min from Tzomet HaKfar HaYarok',
+          legsHtml: `
+            <span class="text-slate-300"><i class="fa-solid fa-person-walking"></i></span>
+            <i class="fa-solid fa-chevron-right text-[8px] text-slate-500"></i>
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold">47 / 48 <i class="fa-solid fa-bus"></i></span>
+            <i class="fa-solid fa-chevron-right text-[8px] text-slate-500"></i>
+            <span class="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold">45 <i class="fa-solid fa-train"></i></span>
+          `,
+          duration: destKey === 'kiryat_gat' ? '1 hr 50m' : '14 min',
+          times: destKey === 'kiryat_gat' ? '18:34 → 20:24' : '18:34 → 18:48',
+          price: destKey === 'kiryat_gat' ? '₪35.00' : '₪5.50',
+          xp: '+80 XP',
+          eco: 'CO2e: 3.7 kg',
+          recommended: !isInsideCfar,
+          icon: 'fa-bus',
+          accent: 'blue',
           coords: pathCoords
         },
         {
@@ -918,38 +1008,28 @@
           mode: 'scooter',
           title: 'Campus E-Scooter / Bike Lane',
           subtitle: 'Fastest micro-mobility lane via Olive Grove',
+          legsHtml: `<span class="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold"><i class="fa-solid fa-bicycle"></i> Lime / Bird</span>`,
           duration: isInsideCfar ? '2 min' : '9 min',
+          times: '18:34 → 18:36',
           price: isInsideCfar ? '₪0.00' : '₪7.50',
           xp: '+110 XP',
-          eco: '95% Eco',
+          eco: 'CO2e: 0.1 kg',
           recommended: false,
           icon: 'fa-bicycle',
           accent: 'teal',
           coords: pathCoords
         },
         {
-          id: 'transit_hub',
-          mode: 'transit',
-          title: 'Line 47 / 48 + Ayalon Rail',
-          subtitle: 'Live arrival at Shaar HaKfar Junction in 2 mins',
-          duration: '14 min',
-          price: '₪5.50',
-          xp: '+80 XP',
-          eco: '82% Eco',
-          recommended: !isInsideCfar,
-          icon: 'fa-bus',
-          accent: 'blue',
-          coords: pathCoords
-        },
-        {
           id: 'rideshare_taxi',
           mode: 'transit',
-          title: 'Gett / Yango Express Dropoff',
-          subtitle: 'Perimeter gate pickup & direct dropoff',
-          duration: '8 min',
-          price: '₪28.00',
+          title: 'Gett / Yango Express Taxi',
+          subtitle: 'Immediate pickup at main gate',
+          legsHtml: `<span class="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-extrabold">Gett.</span>`,
+          duration: destKey === 'kiryat_gat' ? '1 hr 3m' : '8 min',
+          times: destKey === 'kiryat_gat' ? '18:26 → 19:29' : '18:34 → 18:42',
+          price: destKey === 'kiryat_gat' ? '₪210.00' : '₪28.00',
           xp: '+30 XP',
-          eco: '40% Eco',
+          eco: 'CO2e: 11.28 kg',
           recommended: false,
           icon: 'fa-taxi',
           accent: 'amber',
@@ -962,33 +1042,28 @@
         .sort((a, b) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0));
 
       routeList.innerHTML = filtered.map(r => `
-        <div class="p-3.5 rounded-2xl bg-slate-900/90 border ${r.recommended ? 'border-emerald-500/60 shadow-lg shadow-emerald-500/10' : 'border-slate-800'} space-y-2.5 transition hover:border-emerald-400/50">
+        <div class="p-3.5 rounded-2xl bg-slate-900/95 border ${r.recommended ? 'border-emerald-500/70 shadow-lg shadow-emerald-500/10' : 'border-slate-800'} space-y-2.5 transition hover:border-emerald-400/50">
           <div class="flex items-start justify-between gap-2">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-xl bg-${r.accent}-500/20 text-${r.accent}-400 flex items-center justify-center text-sm shrink-0">
-                <i class="fa-solid ${r.icon}"></i>
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap font-mono text-[11px]">
+                ${r.legsHtml}
+                ${r.recommended ? '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">⭐ RECOMMENDED</span>' : ''}
               </div>
-              <div>
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <h4 class="font-extrabold text-xs text-white">${r.title}</h4>
-                  ${r.recommended ? '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">⭐ TOP RECOMMENDED</span>' : ''}
-                </div>
-                <p class="text-[11px] text-slate-400 mt-0.5">${r.subtitle}</p>
-              </div>
+              <h4 class="font-extrabold text-xs text-white">${r.title}</h4>
+              <p class="text-[11px] text-slate-400">${r.subtitle} • <span class="text-emerald-400 font-bold">${r.price}</span></p>
             </div>
-            <div class="text-right shrink-0">
+            <div class="text-right shrink-0 bg-slate-950/70 px-2.5 py-1.5 rounded-xl border border-slate-800">
               <span class="font-extrabold text-sm text-white block">${r.duration}</span>
-              <span class="font-mono text-xs font-bold text-emerald-400">${r.price}</span>
+              <span class="font-mono text-[10px] text-slate-400">${r.times}</span>
             </div>
           </div>
           <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[10px] font-mono">
             <div class="flex items-center gap-2 text-slate-400">
-              <span class="text-emerald-400"><i class="fa-solid fa-leaf"></i> ${r.eco}</span>
-              <span>•</span>
-              <span class="text-amber-400"><i class="fa-solid fa-bolt"></i> ${r.xp}</span>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-earth-americas"></i> ${r.eco}</span>
+              <span class="text-amber-400 font-bold"><i class="fa-solid fa-bolt"></i> ${r.xp}</span>
             </div>
-            <button onclick="startRouteNavigation('${r.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold transition flex items-center gap-1">
-              <i class="fa-solid fa-play text-[9px]"></i> Start Route
+            <button onclick="startRouteNavigation('${r.id}')" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold transition flex items-center gap-1 shadow-sm">
+              <i class="fa-solid fa-play text-[9px]"></i> Go
             </button>
           </div>
         </div>
@@ -1175,6 +1250,7 @@
     function setupMobileTouchSheet() {
       const panel = document.getElementById('sidePanel');
       const handle = document.getElementById('drawerDragHandle');
+      if (!panel || !handle) return;
       let startY = 0;
       let startHeight = 0;
 
@@ -1293,8 +1369,12 @@
     }
 
     // High-DPI Canvas & Touch Event Support for 3D AR Ground View
+    let arCameraStream = null;
+    let arAnimationId = null;
+
     function initARCanvas() {
       arCanvas = document.getElementById('arCanvas');
+      if (!arCanvas) return;
       arCtx = arCanvas.getContext('2d');
 
       const handleStart = (clientX) => {
@@ -1305,7 +1385,7 @@
       const handleMove = (clientX) => {
         if (!isDraggingAR) return;
         const delta = clientX - lastMouseX;
-        arCameraYaw += delta * 0.005;
+        arCameraYaw += delta * 0.008;
         lastMouseX = clientX;
       };
 
@@ -1318,81 +1398,152 @@
       arCanvas.addEventListener('touchstart', e => { if (e.touches.length > 0) handleStart(e.touches[0].clientX); }, { passive: true });
       window.addEventListener('touchmove', e => { if (e.touches.length > 0) handleMove(e.touches[0].clientX); }, { passive: true });
       window.addEventListener('touchend', handleEnd);
+    }
 
-      requestAnimationFrame(renderARScene);
+    async function enableARCamera() {
+      const video = document.getElementById('arCameraVideo');
+      const btnText = document.getElementById('arCamBtnText');
+      if (arCameraStream) {
+        arCameraStream.getTracks().forEach(t => t.stop());
+        arCameraStream = null;
+        video.classList.add('hidden');
+        btnText.innerText = 'Enable Live Camera';
+        return;
+      }
+      try {
+        arCameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+        video.srcObject = arCameraStream;
+        video.classList.remove('hidden');
+        btnText.innerText = 'Camera Active (Tap to Stop)';
+        showToast("Live AR Camera Feed Active!", "fa-camera");
+      } catch (err) {
+        showToast("Camera blocked or unavailable • Using 3D AR Simulation", "fa-vr-cardboard");
+      }
     }
 
     function renderARScene() {
-      if (!arCanvas || document.getElementById('arViewOverlay').classList.contains('hidden')) {
-        requestAnimationFrame(renderARScene);
+      const overlay = document.getElementById('arViewOverlay');
+      if (!arCanvas || !arCtx || overlay.classList.contains('hidden')) {
         return;
       }
 
-      arCanvas.width = arCanvas.clientWidth;
-      arCanvas.height = arCanvas.clientHeight;
-      const w = arCanvas.width;
-      const h = arCanvas.height;
-
-      // Render Environment Sky & Ground Grid
-      const skyGradient = arCtx.createLinearGradient(0, 0, 0, h/2);
-      if (currentGeofenceZone === 'inside_cfar') {
-        skyGradient.addColorStop(0, '#022c22');
-        skyGradient.addColorStop(1, '#064e3b');
-      } else {
-        skyGradient.addColorStop(0, '#0f172a');
-        skyGradient.addColorStop(1, '#1e293b');
+      const rect = arCanvas.parentElement.getBoundingClientRect();
+      const w = Math.max(300, rect.width);
+      const h = Math.max(300, rect.height);
+      if (arCanvas.width !== w || arCanvas.height !== h) {
+        arCanvas.width = w;
+        arCanvas.height = h;
       }
-      arCtx.fillStyle = skyGradient;
-      arCtx.fillRect(0, 0, w, h/2);
 
-      // Ground
-      const groundGradient = arCtx.createLinearGradient(0, h/2, 0, h);
-      groundGradient.addColorStop(0, '#064e3b');
-      groundGradient.addColorStop(1, '#022c22');
-      arCtx.fillStyle = groundGradient;
-      arCtx.fillRect(0, h/2, w, h/2);
+      arCtx.clearRect(0, 0, w, h);
 
-      // Horizon Line
-      arCtx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
-      arCtx.lineWidth = 2;
-      arCtx.beginPath();
-      arCtx.moveTo(0, h/2);
-      arCtx.lineTo(w, h/2);
-      arCtx.stroke();
+      // Only draw synthetic sky/ground if real camera is NOT active
+      if (!arCameraStream) {
+        const skyGradient = arCtx.createLinearGradient(0, 0, 0, h * 0.52);
+        if (currentGeofenceZone === 'inside_cfar') {
+          skyGradient.addColorStop(0, '#022c22');
+          skyGradient.addColorStop(1, '#065f46');
+        } else {
+          skyGradient.addColorStop(0, '#0f172a');
+          skyGradient.addColorStop(1, '#1e293b');
+        }
+        arCtx.fillStyle = skyGradient;
+        arCtx.fillRect(0, 0, w, h * 0.52);
 
-      // Perspective Path Road Lines
-      const centerX = w/2 + Math.sin(arCameraYaw) * 150;
-      arCtx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-      arCtx.beginPath();
-      arCtx.moveTo(centerX - 10, h/2);
-      arCtx.lineTo(centerX + 10, h/2);
-      arCtx.lineTo(w/2 + 180, h);
-      arCtx.lineTo(w/2 - 180, h);
-      arCtx.closePath();
-      arCtx.fill();
+        const groundGradient = arCtx.createLinearGradient(0, h * 0.52, 0, h);
+        groundGradient.addColorStop(0, '#064e3b');
+        groundGradient.addColorStop(1, '#022c22');
+        arCtx.fillStyle = groundGradient;
+        arCtx.fillRect(0, h * 0.52, w, h * 0.48);
 
-      // Floating AR Direction Chevrons
-      const time = Date.now() * 0.003;
-      for (let i = 0; i < 3; i++) {
-        const progress = ((time + i * 0.3) % 1);
-        const y = h/2 + progress * (h/2);
-        const size = 15 + progress * 40;
-        
-        arCtx.strokeStyle = `rgba(16, 185, 129, ${1 - progress})`;
-        arCtx.lineWidth = 4;
+        // Horizon Line
+        arCtx.strokeStyle = 'rgba(52, 211, 153, 0.5)';
+        arCtx.lineWidth = 2;
         arCtx.beginPath();
-        arCtx.moveTo(centerX - size, y);
-        arCtx.lineTo(centerX, y - size*0.5);
-        arCtx.lineTo(centerX + size, y);
+        arCtx.moveTo(0, h * 0.52);
+        arCtx.lineTo(w, h * 0.52);
         arCtx.stroke();
       }
 
-      requestAnimationFrame(renderARScene);
+      const centerX = w / 2 + Math.sin(arCameraYaw) * (w * 0.35);
+
+      // 3D AR Illuminated Walkway Carpet
+      arCtx.fillStyle = 'rgba(16, 185, 129, 0.28)';
+      arCtx.beginPath();
+      arCtx.moveTo(centerX - 18, h * 0.54);
+      arCtx.lineTo(centerX + 18, h * 0.54);
+      arCtx.lineTo(w / 2 + 160, h);
+      arCtx.lineTo(w / 2 - 160, h);
+      arCtx.closePath();
+      arCtx.fill();
+
+      // Animated Forward AR Chevrons (Speed reactive)
+      const speedFactor = (parseFloat(arSpeed) || 5) * 0.0007;
+      const time = Date.now() * speedFactor;
+      for (let i = 0; i < 4; i++) {
+        const progress = ((time + i * 0.25) % 1);
+        const y = h * 0.54 + progress * (h * 0.44);
+        const size = 16 + progress * 48;
+        const currX = centerX + (w / 2 - centerX) * progress;
+
+        arCtx.strokeStyle = `rgba(52, 211, 153, ${1 - progress * 0.85})`;
+        arCtx.lineWidth = 4 + progress * 3;
+        arCtx.lineCap = 'round';
+        arCtx.lineJoin = 'round';
+        arCtx.beginPath();
+        arCtx.moveTo(currX - size, y);
+        arCtx.lineTo(currX, y - size * 0.45);
+        arCtx.lineTo(currX + size, y);
+        arCtx.stroke();
+      }
+
+      // Floating 3D Destination Waypoint Signpost in AR Space
+      const destSelect = document.getElementById('destSelect');
+      const destLabel = destSelect ? destSelect.options[destSelect.selectedIndex].text : 'High School Hub';
+      const signY = h * 0.34;
+      arCtx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      arCtx.strokeStyle = '#10B981';
+      arCtx.lineWidth = 2;
+      const boxW = Math.min(260, w * 0.72);
+      const boxH = 54;
+      arCtx.beginPath();
+      arCtx.roundRect(centerX - boxW / 2, signY, boxW, boxH, 14);
+      arCtx.fill();
+      arCtx.stroke();
+
+      arCtx.fillStyle = '#34d399';
+      arCtx.font = 'bold 12px "JetBrains Mono", monospace';
+      arCtx.textAlign = 'center';
+      arCtx.fillText('▲ 65m AHEAD • INTERNAL PATH', centerX, signY + 21);
+
+      arCtx.fillStyle = '#ffffff';
+      arCtx.font = 'bold 13px "Plus Jakarta Sans", sans-serif';
+      arCtx.fillText(destLabel, centerX, signY + 41);
+
+      arAnimationId = requestAnimationFrame(renderARScene);
     }
 
     function toggleImmersiveAR() {
       const overlay = document.getElementById('arViewOverlay');
-      overlay.classList.toggle('hidden');
+      const isHidden = overlay.classList.contains('hidden');
+      if (isHidden) {
+        overlay.classList.remove('hidden');
+        if (!arCanvas) initARCanvas();
+        if (arAnimationId) cancelAnimationFrame(arAnimationId);
+        requestAnimationFrame(renderARScene);
+      } else {
+        overlay.classList.add('hidden');
+        if (arAnimationId) cancelAnimationFrame(arAnimationId);
+        if (arCameraStream) {
+          arCameraStream.getTracks().forEach(t => t.stop());
+          arCameraStream = null;
+          document.getElementById('arCameraVideo').classList.add('hidden');
+          document.getElementById('arCamBtnText').innerText = 'Enable Live Camera';
+        }
+      }
     }
 
     function updateARSpeed(val) {
@@ -1437,3 +1588,24 @@
     function navigateToPOI(poiTitle) {
       showToast(`Navigating to ${poiTitle}...`, "fa-location-arrow");
       teleportLocation('cfarSchool');
+    }
+
+    function triggerXPModal() {
+      document.getElementById('xpModal').classList.remove('hidden');
+      playHarmonicChime();
+    }
+
+    function closeXPModal() {
+      document.getElementById('xpModal').classList.add('hidden');
+    }
+
+    function showToast(msg, icon = 'fa-bell') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      document.getElementById('toastIcon').className = `fa-solid ${icon} text-emerald-400 text-sm`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+  </script>
+</body>
+</html>
